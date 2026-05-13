@@ -1,5 +1,5 @@
 [project]
-name = "cf-helper-py"
+name = "cf-helper"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -15,5 +15,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "freezegun>=1.5.5",
     "pytest>=9.0.3",
+    "ruff>=0.15.12",
 ]
