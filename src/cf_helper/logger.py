@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import traceback as tb
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
 
@@ -18,8 +19,9 @@ class _color(StrEnum):
 
 class _JsonFormatter(logging.Formatter):
     def format(self, record):
+        ct = datetime.fromtimestamp(record.created)
         rec: dict[str, Any] = {
-            "timestamp": self.formatTime(record),
+            "timestamp": ct.isoformat(sep=" ").rstrip("0"),
             "message": record.getMessage(),
             "level": record.levelname.lower(),
             "file": record.pathname,
@@ -63,7 +65,7 @@ class _ExtraAdapter(logging.LoggerAdapter):
 def setup_logging(force: bool | None = None, color: bool = True):
     hdl = logging.StreamHandler(sys.stdout)
     if os.getenv("ENV") == "prod":
-        hdl.setFormatter(_JsonFormatter())
+        hdl.setFormatter(_JsonFormatter(datefmt="%Y-%m-%d %H:%M:%S"))
     else:  # pragma no cover
         if color:
             fmt = (
@@ -73,7 +75,7 @@ def setup_logging(force: bool | None = None, color: bool = True):
             )
         else:
             fmt = "%(levelname)-6s  %(asctime)s [%(funcName)s:%(lineno)d] %(message)s"
-        hdl.setFormatter(logging.Formatter(fmt=fmt))
+        hdl.setFormatter(logging.Formatter(fmt=fmt, datefmt="%Y-%m-%d %H:%M:%S"))
     logging.basicConfig(level=logging.DEBUG, handlers=[hdl], force=force)
 
 

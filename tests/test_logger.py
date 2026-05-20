@@ -1,13 +1,22 @@
 import json
 import logging
 import sys
+from datetime import datetime
 
+import pytest
 from freezegun import freeze_time
 
 from cf_helper.logger import _ExtraAdapter, _JsonFormatter, logger, setup_logging
 
+iso_time = "2026-01-02 03:04:05.678"
 
-@freeze_time("2026-01-02 03:04:05.678")
+
+@pytest.fixture(autouse=True)
+def set_time():
+    with freeze_time(iso_time):
+        yield
+
+
 def test_json_formatter():
     fmt = _JsonFormatter()
 
@@ -16,7 +25,7 @@ def test_json_formatter():
     )
 
     assert json.loads(res) == {
-        "timestamp": "2026-01-01 22:04:05,677",
+        "timestamp": iso_time,
         "message": "msg",
         "level": "debug",
         "file": "path",
@@ -24,7 +33,6 @@ def test_json_formatter():
     }
 
 
-@freeze_time("2026-01-02 03:04:05.678")
 def test_json_formatter_extra():
     fmt = _JsonFormatter()
 
@@ -34,7 +42,7 @@ def test_json_formatter_extra():
     res = fmt.format(rec)
 
     assert json.loads(res) == {
-        "timestamp": "2026-01-01 22:04:05,677",
+        "timestamp": iso_time,
         "message": "msg",
         "level": "debug",
         "file": "path",
@@ -43,7 +51,6 @@ def test_json_formatter_extra():
     }
 
 
-@freeze_time("2026-01-02 03:04:05.678")
 def test_json_formatter_error():
     fmt = _JsonFormatter()
 
@@ -60,7 +67,7 @@ def test_json_formatter_error():
     )
 
     assert json.loads(res) == {
-        "timestamp": "2026-01-01 22:04:05,677",
+        "timestamp": iso_time,
         "message": "msg",
         "level": "debug",
         "file": "path",
