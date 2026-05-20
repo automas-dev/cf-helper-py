@@ -39,8 +39,10 @@ jobs:
         run: uv run pytest
 
   increment_version:
-    uses: automas-dev/reusable-workflows/.github/workflows/increment_version.yml@main
+    uses: automas-dev/reusable-workflows/.github/workflows/increment_version.yml@v1.0
     secrets: inherit
+    with:
+      dry-run: ${{ github.ref != 'refs/heads/main' || contains(github.event.head_commit.message, 'NO RELEASE') }}
 
     needs: [lint_test]
 
