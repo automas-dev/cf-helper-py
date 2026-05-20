@@ -1,40 +1,146 @@
 import json
-import io
+import logging
+import sys
+from datetime import datetime
+
 import pytest
-from cf_helper.logger import _Logger
 from freezegun import freeze_time
 
+from cf_helper.logger import _ExtraAdapter, _JsonFormatter, logger, setup_logging
 
-@freeze_time("2026-01-02 03:04:05.678")
-def test_logger_log():
-    sink = io.StringIO()
+iso_time = "2026-01-02 03:04:05.678"
 
-    logger = _Logger(sink)
-    logger.log("info", "Hello world")
 
-    assert json.loads(sink.getvalue()) == {
-        "timestamp": "2026-01-02T03:04:05.678000",
-        "message": "Hello world",
-        "level": "info",
-        "extra": {},
-        "file": "TODO",
-        "location": "TODO:TODO",
+@pytest.fixture(autouse=True)
+def set_time():
+    with freeze_time(iso_time):
+        yield
+
+
+def test_json_formatter():
+    fmt = _JsonFormatter()
+
+    res = fmt.format(
+        logging.LogRecord("name", logging.DEBUG, "path", 0, "msg", None, None)
+    )
+
+    assert json.loads(res) == {
+        "timestamp": iso_time,
+        "message": "msg",
+        "level": "debug",
+        "file": "path",
+        "location": "None:0",
     }
 
 
-@freeze_time("2026-01-02 03:04:05.678")
-@pytest.mark.parametrize(
-    "fn,level",
-    [
-        ("debug", "debug"),
-        ("info", "info"),
-        ("warn", "warn"),
-        ("error", "error"),
-        ("exception", "error"),
-    ],
-)
-def test_logger_levels(fn, level):
-    sink = io.StringIO()
-    logger = _Logger(sink)
-    getattr(logger, fn)("Hello world")
-    assert json.loads(sink.getvalue())["level"] == level
+def test_json_formatter_extra():
+    fmt = _JsonFormatter()
+
+    rec = logging.LogRecord("name", logging.DEBUG, "path", 0, "msg", None, None)
+    setattr(rec, "extra", {"foo": "bar"})
+
+    res = fmt.format(rec)
+
+    assert json.loads(res) == {
+        "timestamp": iso_time,
+        "message": "msg",
+        "level": "debug",
+        "file": "path",
+        "location": "None:0",
+        "extra": {"foo": "bar"},
+    }
+
+
+def test_json_formatter_error():
+    fmt = _JsonFormatter()
+
+    res = fmt.format(
+        logging.LogRecord(
+            "name",
+            logging.DEBUG,
+            "path",
+            0,
+            "msg",
+            None,
+            (Exception, Exception("error"), None),
+        )
+    )
+
+    assert json.loads(res) == {
+        "timestamp": iso_time,
+        "message": "msg",
+        "level": "debug",
+        "file": "path",
+        "location": "None:0",
+        "exception": {
+            "name": "Exception",
+            "value": "error",
+            "stack": ["Exception: error\n"],
+        },
+    }
+
+
+def test_setup_logger():
+    setup_logging(force=True)
+
+    assert isinstance(logging.root.handlers[0], logging.StreamHandler)
+    assert logging.root.handlers[0].stream is sys.stdout
+
+
+def test_setup_logger_prod(monkeypatch):
+    monkeypatch.setenv("ENV", "prod")
+
+    setup_logging(force=True)
+
+    assert isinstance(logging.root.handlers[0], logging.StreamHandler)
+    assert logging.root.handlers[0].stream is sys.stdout
+    assert isinstance(logging.root.handlers[0].formatter, _JsonFormatter)
+
+
+def test_extra_adapter():
+    adp = _ExtraAdapter(logging.root, extra={"foo": "bar"})
+
+    _, kwargs = adp.process("", {})
+
+    assert kwargs["extra"] == {"extra": {"foo": "bar"}}
+
+
+def test_extra_adapter_merge():
+    adp = _ExtraAdapter(logging.root, merge_extra=True, extra={"foo": "bar"})
+
+    _, kwargs = adp.process("", {"extra": {"more": "baz"}})
+
+    assert kwargs["extra"] == {"extra": {"foo": "bar", "more": "baz"}}
+
+
+def test_extra_adapter_merge_no_extra():
+    adp = _ExtraAdapter(logging.root, merge_extra=True)
+
+    _, kwargs = adp.process("", {"extra": {"more": "baz"}})
+
+    assert kwargs["extra"] == {"extra": {"more": "baz"}}
+
+
+def test_extra_adapter_disable_merge():
+    adp = _ExtraAdapter(logging.root, merge_extra=False, extra={"foo": "bar"})
+
+    _, kwargs = adp.process("", {"extra": {"more": "baz"}})
+
+    assert kwargs["extra"] == {"extra": {"foo": "bar"}}
+
+
+def test_extra_adapter_append_keys():
+    adp = _ExtraAdapter(logging.root, merge_extra=True)
+    # Attach when self.extra is None
+    adp.attach_keys(foo="bar")
+    # Attach when self.extra is not None (branch coverage)
+    adp.attach_keys(baz="bash")
+
+    _, kwargs = adp.process("", {"extra": {"more": "baz"}})
+
+    assert kwargs["extra"] == {"extra": {"foo": "bar", "baz": "bash", "more": "baz"}}
+
+
+def test_logger():
+    assert isinstance(logger, _ExtraAdapter)
+    assert logger.merge_extra
