@@ -6,7 +6,7 @@ from datetime import datetime
 import pytest
 from freezegun import freeze_time
 
-from cf_helper.logger import _ExtraAdapter, _JsonFormatter, logger, setup_logging
+from cf_helper_py.logger import _ExtraAdapter, _JsonFormatter, logger, setup_logging
 
 iso_time = "2026-01-02 03:04:05.678"
 

@@ -1,5 +1,5 @@
 [project]
-name = "cf-helper"
+name = "cf-helper-py"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
